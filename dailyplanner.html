@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WAYNE TERMINAL: PROTOCOL 90</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #050505;
+            --panel-bg: #0b0b0b;
+            --border-color: #333;
+            --text-main: #d0d0d0;
+            --text-dim: #666;
+            
+            /* Batman Palette */
+            --bat-gold: #F5C518;
+            --bat-gold-dim: rgba(245, 197, 24, 0.15);
+            --bat-blue: #00f0ff; 
+            
+            --success: #00ff9d;
+            --danger: #ff3333;
+            
+            --font-head: 'Orbitron', sans-serif;
+            --font-body: 'Rajdhani', sans-serif;
+            --font-code: 'Share Tech Mono', monospace;
+        }
+
+        * { box-sizing: border-box; scrollbar-width: thin; scrollbar-color: var(--bat-gold) var(--bg-color); }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: var(--font-body);
+            margin: 0;
+            padding: 0;
+            padding-bottom: 80px;
+            background-image: 
+                linear-gradient(rgba(5, 5, 5, 0.95), rgba(0, 0, 0, 1)), 
+                url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h40v40H0V0zm1 1h38v38H1V1z' fill='%23222' fill-opacity='0.2' fill-rule='evenodd'/%3E%3C/svg%3E");
+        }
+
+        /* --- LAYOUT GRID --- */
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1fr;
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 10px;
+            gap: 20px;
+        }
+
+        @media (min-width: 1024px) {
+            .main-layout {
+                grid-template-columns: 300px 1fr;
+                padding: 40px;
+                height: 100vh;
+                overflow: hidden;
+            }
+            .scrollable-content { height: 100%; overflow-y: auto; padding-right: 10px; }
+            .mobile-nav { display: none !important; }
+            .desktop-sidebar { display: flex !important; }
+        }
+
+        /* --- HEADER --- */
+        .header-bar {
+            grid-column: 1 / -1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--bat-gold);
+            padding-bottom: 15px;
+            margin-bottom: 10px;
+        }
+
+        .bat-logo {
+            width: 50px;
+            height: 30px;
+            fill: var(--bat-gold);
+            filter: drop-shadow(0 0 8px var(--bat-gold));
+        }
+
+        .terminal-title {
+            font-family: var(--font-head);
+            font-weight: 900;
+            font-size: 1.2rem;
+            letter-spacing: 2px;
+            color: white;
+            text-transform: uppercase;
+        }
+        
+        .save-status {
+            font-family: var(--font-code);
+            font-size: 0.7rem;
+            color: var(--bat-gold);
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+        .save-status.show { opacity: 1; }
+        
+        .streak-badge {
+            font-family: var(--font-code);
+            color: var(--bat-gold);
+            border: 1px solid var(--bat-gold);
+            padding: 5px 10px;
+            font-size: 0.8rem;
+            background: rgba(245, 197, 24, 0.05);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .fire-icon { color: #ff5500; text-shadow: 0 0 5px #ff5500; }
+
+        /* --- PANELS --- */
+        .panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            padding: 20px;
+            border-radius: 2px;
+            position: relative;
+            margin-bottom: 20px;
+        }
+        .panel::before { content: ''; position: absolute; top: 0; left: 0; width: 8px; height: 8px; border-top: 2px solid var(--bat-gold); border-left: 2px solid var(--bat-gold); }
+        .panel::after { content: ''; position: absolute; bottom: 0; right: 0; width: 8px; height: 8px; border-bottom: 2px solid var(--bat-gold); border-right: 2px solid var(--bat-gold); }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            color: var(--bat-gold);
+            font-family: var(--font-head);
+            letter-spacing: 1px;
+            font-size: 0.9rem;
+            border-bottom: 1px solid #222;
+            padding-bottom: 8px;
+        }
+
+        /* --- HYDRATION --- */
+        .hydro-container { margin-bottom: 20px; background: #000; padding: 15px; border: 1px solid #222; }
+        .hydro-bar-bg { width: 100%; height: 20px; background: #111; border: 1px solid #333; margin: 10px 0; position: relative; overflow: hidden; }
+        .hydro-bar-fill { height: 100%; width: 0%; background: var(--bat-blue); box-shadow: 0 0 10px var(--bat-blue); transition: width 0.3s ease; }
+        .hydro-controls { display: flex; gap: 10px; justify-content: center; }
+        .btn-hydro { background: transparent; border: 1px solid var(--bat-blue); color: var(--bat-blue); padding: 5px 15px; font-family: var(--font-code); cursor: pointer; font-size: 0.8rem; }
+        .hydro-stat { text-align: right; font-family: var(--font-code); color: var(--bat-blue); font-size: 0.9rem; }
+
+        /* --- NAVIGATION --- */
+        .desktop-sidebar { display: none; flex-direction: column; gap: 10px; background: #080808; padding: 20px; border-right: 1px solid #333; }
+        .side-btn { background: transparent; border: 1px solid #333; color: #888; padding: 15px; text-align: left; font-family: var(--font-head); cursor: pointer; transition: 0.2s; }
+        .side-btn:hover, .side-btn.active { border-color: var(--bat-gold); color: var(--bat-gold); background: var(--bat-gold-dim); padding-left: 20px; }
+        .mobile-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: #000; border-top: 2px solid var(--bat-gold); display: flex; overflow-x: auto; z-index: 100; }
+        .mobile-btn { flex: 1; min-width: 70px; background: none; border: none; color: #555; padding: 15px 5px; font-family: var(--font-head); font-size: 0.6rem; cursor: pointer; text-align: center; }
+        .mobile-btn.active { color: var(--bat-gold); background: var(--bat-gold-dim); }
+
+        .section-view { display: none; animation: fadeIn 0.3s ease; }
+        .section-view.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* --- CHECKLISTS --- */
+        .task-row { display: flex; justify-content: space-between; padding: 12px; background: rgba(255,255,255,0.03); margin-bottom: 8px; border-left: 3px solid transparent; transition: 0.2s; }
+        .task-row:hover { background: rgba(255,255,255,0.05); }
+        .chk-group { display: flex; align-items: center; gap: 15px; }
+        input[type="checkbox"] { appearance: none; width: 20px; height: 20px; border: 2px solid #555; background: transparent; cursor: pointer; display: grid; place-content: center; }
+        input[type="checkbox"]::before { content: ""; width: 10px; height: 10px; background: var(--bat-gold); transform: scale(0); transition: 0.2s; }
+        input[type="checkbox"]:checked { border-color: var(--bat-gold); }
+        input[type="checkbox"]:checked::before { transform: scale(1); }
+        .task-text { font-size: 1rem; color: #ddd; }
+        .task-meta { font-family: var(--font-code); font-size: 0.65rem; color: var(--bat-gold); border: 1px solid var(--bat-gold); padding: 2px 6px; border-radius: 2px; }
+
+        /* --- WORKOUT TABLE --- */
+        .workout-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        .workout-table td { padding: 10px 5px; border-bottom: 1px solid #222; }
+        .set-input { width: 45px; background: #000; border: 1px solid #444; color: var(--bat-gold); text-align: center; font-family: var(--font-code); padding: 8px; font-size: 1rem; }
+        
+        /* --- TIMER --- */
+        .timer-container { text-align: center; background: #080808; border: 1px solid #333; padding: 30px; margin-bottom: 20px; }
+        .timer-display { font-family: var(--font-code); font-size: 4rem; color: white; margin: 10px 0; }
+        .btn-bat { background: var(--bat-gold); color: black; border: none; padding: 12px 30px; font-family: var(--font-head); font-weight: 900; font-size: 0.9rem; cursor: pointer; clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); }
+        .btn-bat.stop { background: var(--danger); color: white; }
+        .btn-reset { background: transparent; border: 2px solid #333; color: #888; padding: 12px 20px; font-family: var(--font-head); font-weight: 700; cursor: pointer; }
+
+        /* --- REVIEW SCORING --- */
+        .score-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .score-box { background: #000; padding: 10px; border: 1px solid #222; text-align: center; }
+        .score-box input { width: 100%; background: transparent; border: none; color: white; text-align: center; font-family: var(--font-head); font-size: 1.2rem; }
+
+        /* --- COMPLETION BUTTON --- */
+        .complete-btn {
+            background: #111; border: 2px solid #333; color: #555;
+            width: 100%; padding: 20px;
+            font-family: var(--font-head); font-size: 1.2rem; font-weight: 900;
+            text-transform: uppercase; letter-spacing: 2px;
+            cursor: pointer; margin-top: 20px;
+            transition: all 0.3s;
+        }
+        .complete-btn.done {
+            background: var(--success); color: black; border-color: var(--success);
+            box-shadow: 0 0 20px rgba(0, 255, 157, 0.3);
+        }
+
+        .data-btn {
+            background: #111; border: 1px solid #444; color: #aaa; padding: 10px; width: 100%; margin-top: 10px; cursor: pointer; font-family: var(--font-code);
+        }
+        .data-btn:hover { border-color: white; color: white; }
+    </style>
+</head>
+<body>
+
+<div class="main-layout">
+
+    <nav class="desktop-sidebar">
+        <div style="text-align: center; margin-bottom: 20px;">
+            <svg class="bat-logo" viewBox="0 0 100 60"><path d="M50 35 C35 35 30 55 20 55 C10 55 0 30 0 25 C5 25 15 30 20 20 C25 10 30 15 35 15 C30 5 40 0 50 10 C60 0 70 5 65 15 C70 15 75 10 80 20 C85 30 95 25 100 25 C100 30 90 55 80 55 C70 55 65 35 50 35 Z" /></svg>
+            <div class="terminal-title" style="font-size: 0.9rem; margin-top:10px;">PROTOCOL 90</div>
+        </div>
+        <button class="side-btn active" onclick="navTo('body')">BODY</button>
+        <button class="side-btn" onclick="navTo('mind')">MIND</button>
+        <button class="side-btn" onclick="navTo('heart')">HEART</button>
+        <button class="side-btn" onclick="navTo('purpose')">PURPOSE</button>
+        <button class="side-btn" onclick="navTo('wealth')">WEALTH</button>
+        <button class="side-btn" onclick="navTo('review')">REVIEW</button>
+    </nav>
+
+    <div class="scrollable-content">
+        
+        <div class="header-bar">
+            <div>
+                <span class="terminal-title">WAYNE TERMINAL</span>
+                <span style="font-family: var(--font-code); color: #666; font-size: 0.8rem; margin-left: 10px;">SYS.V.9.0</span>
+                <span id="save-indicator" class="save-status">[SAVING DATA...]</span>
+            </div>
+            
+            <div style="display: flex; gap: 20px; align-items: center;">
+                <div class="streak-badge">
+                    <span class="fire-icon">🔥</span>
+                    STREAK: <span id="streak-count">0</span>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-family: var(--font-head); color: var(--bat-gold); font-size: 1.2rem;" id="day-display">DAY 01</div>
+                    <div style="font-size: 0.7rem; color: #666; letter-spacing: 1px; text-transform: uppercase;" id="date-display">LOADING...</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-body" class="section-view active">
+            <div class="panel">
+                <div class="panel-header">
+                    <span style="color:var(--bat-blue)">HYDRATION LEVEL</span>
+                    <span class="hydro-stat" id="hydro-text">0 / 3500 ML</span>
+                </div>
+                <div class="hydro-container">
+                    <div class="hydro-bar-bg">
+                        <div class="hydro-bar-fill" id="hydro-bar"></div>
+                    </div>
+                    <div class="hydro-controls">
+                        <button class="btn-hydro" onclick="updateWater(250)">+ 250ML</button>
+                        <button class="btn-hydro" onclick="updateWater(500)">+ 500ML</button>
+                        <button class="btn-hydro" style="border-color:#555; color:#555" onclick="updateWater(-10000)">RESET</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <span>TRAINING PROTOCOL</span>
+                    <span id="phase-badge" style="font-size: 0.7rem; border:1px solid var(--bat-gold); padding: 2px 5px;">PHASE 1</span>
+                </div>
+                <div id="workout-container"></div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-header">BIOLOGICAL MAINTENANCE</div>
+                <div id="body-checklist"></div>
+            </div>
+        </div>
+
+        <div id="view-mind" class="section-view">
+            <div class="panel">
+                <div class="panel-header">DEEP WORK FOCUS</div>
+                <div class="timer-container">
+                    <div style="margin-bottom:15px; color:#666; font-family:var(--font-code)">
+                        DURATION (MIN): <input type="number" id="custom-min" value="25" style="background:#111; border:1px solid #444; color:var(--bat-gold); width:50px; text-align:center;" onchange="updateCustomTime()">
+                    </div>
+                    <div class="timer-display" id="timer-text">25:00</div>
+                    <div style="display:flex; justify-content:center; gap:10px;">
+                        <button id="btn-toggle" class="btn-bat" onclick="toggleTimer()">INITIATE</button>
+                        <button class="btn-reset" onclick="resetTimer()">RESET</button>
+                    </div>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-header">INTELLECTUAL DATA</div>
+                <div id="mind-checklist"></div>
+            </div>
+        </div>
+
+        <div id="view-heart" class="section-view">
+            <div class="panel">
+                <div class="panel-header">ALLIES & CONNECTIONS</div>
+                <div class="score-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 20px;">
+                    <div class="score-box"><label>FAMILY</label><input id="in-fam" placeholder="Action" onchange="save()"></div>
+                    <div class="score-box"><label>FRIEND</label><input id="in-frnd" placeholder="Action" onchange="save()"></div>
+                </div>
+                <div id="heart-checklist"></div>
+            </div>
+        </div>
+
+        <div id="view-purpose" class="section-view">
+            <div class="panel">
+                <div class="panel-header">MISSION & SPIRIT</div>
+                <div id="purpose-checklist"></div>
+            </div>
+        </div>
+
+        <div id="view-wealth" class="section-view">
+            <div class="panel">
+                <div class="panel-header">RESOURCE ACQUISITION</div>
+                <div id="wealth-checklist"></div>
+            </div>
+        </div>
+
+        <div id="view-review" class="section-view">
+            <div class="panel">
+                <div class="panel-header">EVENING DEBRIEF</div>
+                <textarea id="journal" style="width:100%; height:120px; background:#000; border:1px solid #333; color:#ddd; padding:15px; font-family:var(--font-body); font-size:1rem;" placeholder="Log mission outcomes..." onchange="save()"></textarea>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-header">PERFORMANCE METRICS (1-10)</div>
+                <div class="score-grid">
+                    <div class="score-box"><label>BODY</label><input type="number" id="score-body" onchange="save()"></div>
+                    <div class="score-box"><label>MIND</label><input type="number" id="score-mind" onchange="save()"></div>
+                    <div class="score-box"><label>HEART</label><input type="number" id="score-heart" onchange="save()"></div>
+                    <div class="score-box"><label>WEALTH</label><input type="number" id="score-wealth" onchange="save()"></div>
+                    <div class="score-box"><label>PURPOSE</label><input type="number" id="score-purp" onchange="save()"></div>
+                    <div class="score-box" style="border-color:var(--bat-gold);"><label style="color:var(--bat-gold)">TOTAL</label><input type="number" id="score-total" readonly style="color:var(--bat-gold)"></div>
+                </div>
+            </div>
+            
+            <button id="btn-complete" class="complete-btn" onclick="toggleComplete()">
+                ☐ MARK MISSION COMPLETE
+            </button>
+
+            <div class="panel" style="margin-top:20px;">
+                <div class="panel-header">DATA ARCHIVE</div>
+                <div style="font-size:0.8rem; color:#666; margin-bottom:10px;">Download a backup to secure your mission logs.</div>
+                <div style="display: flex; gap:10px;">
+                    <button class="data-btn" onclick="exportData()">⬇ DOWNLOAD BACKUP</button>
+                    <label class="data-btn" style="text-align:center;">
+                        ⬆ RESTORE BACKUP
+                        <input type="file" style="display:none" onchange="importData(this)">
+                    </label>
+                </div>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; background: #111; padding: 10px; border: 1px solid #333; margin-top: 20px;">
+                <button class="btn-reset" onclick="changeDay(-1)">PREV DAY</button>
+                <button class="btn-bat" onclick="save()">MANUAL SAVE</button>
+                <button class="btn-reset" onclick="changeDay(1)">NEXT DAY</button>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<nav class="mobile-nav">
+    <button class="mobile-btn active" onclick="navTo('body')">BODY</button>
+    <button class="mobile-btn" onclick="navTo('mind')">MIND</button>
+    <button class="mobile-btn" onclick="navTo('heart')">HEART</button>
+    <button class="mobile-btn" onclick="navTo('purpose')">PURPOSE</button>
+    <button class="mobile-btn" onclick="navTo('wealth')">WEALTH</button>
+    <button class="mobile-btn" onclick="navTo('review')">REVIEW</button>
+</nav>
+
+<script>
+    // --- DATA ---
+    const workouts = {
+        phase1: [
+            {name: "Push-ups (Wall/Knee)", target: "8-12"},
+            {name: "Bodyweight Squats", target: "15-20"},
+            {name: "Assisted Pull-ups", target: "6-10"},
+            {name: "Plank Hold", target: "20-30s"},
+            {name: "Lunges (each)", target: "10-12"},
+            {name: "Mtn Climbers", target: "20-30s"},
+            {name: "Glute Bridges", target: "12-15"},
+            {name: "Dead Bug", target: "8-10"}
+        ],
+        phase2: [
+            {name: "Regular Push-ups", target: "12-15"},
+            {name: "Jump Squats", target: "12-15"},
+            {name: "Negative Pull-ups", target: "5-8"},
+            {name: "Side Plank", target: "30-40s"},
+            {name: "Bulgarian Split Squat", target: "10-12"},
+            {name: "Burpees", target: "8-12"},
+            {name: "Pike Push-ups", target: "8-10"},
+            {name: "Leg Raises", target: "10-15"}
+        ],
+        phase3: [
+            {name: "Diamond Push-ups", target: "15-20"},
+            {name: "Pistol Squats", target: "8-10"},
+            {name: "Full Pull-ups", target: "8-12"},
+            {name: "Plank to Pike", target: "10-15"},
+            {name: "Jump Lunges", target: "10-12"},
+            {name: "Tuck Jumps", target: "10-15"},
+            {name: "Handstand Hold", target: "20-30s"},
+            {name: "Dragon Flags", target: "5-8"}
+        ]
+    };
+
+    const checklists = {
+        body: [{id: "c_sun", text: "Sunlight (5-10m)", meta: "BIO"}, {id: "c_pro", text: "Protein Breakfast", meta: "FUEL"}],
+        mind: [{id: "c_read1", text: "Morning Reading", meta: "30M"}, {id: "c_read2", text: "Evening Reading", meta: "30M"}, {id: "c_learn", text: "Skill Practice", meta: "45M"}],
+        heart: [{id: "c_fam", text: "Quality Family Time", meta: "30M"}, {id: "c_call", text: "Call/Message Family", meta: "CONN"}, {id: "c_kind", text: "Random Act of Kindness", meta: "SERV"}],
+        purpose: [{id: "c_goal", text: "Work on Life Goal", meta: "MIT"}, {id: "c_create", text: "Creative Expression", meta: "FLOW"}, {id: "c_pray", text: "Prayer/Meditation", meta: "SPIRIT"}],
+        wealth: [{id: "c_work", text: "Deep Work Session", meta: "PROF"}, {id: "c_fin", text: "Track Expenses", meta: "FIN"}, {id: "c_net", text: "Networking Action", meta: "GROW"}]
+    };
+
+    // --- STATE ---
+    let currentDay = 1;
+    let currentWater = 0;
+    let isMissionComplete = false;
+    const startDate = new Date();
+    
+    // Timer
+    let timerInterval;
+    let totalSeconds = 25 * 60;
+    let isRunning = false;
+
+    window.onload = function() {
+        const storedDay = localStorage.getItem('dk_day');
+        if(storedDay) currentDay = parseInt(storedDay);
+        loadDayUI(currentDay);
+        renderChecklists();
+        updateStreak();
+    };
+
+    function navTo(viewId) {
+        document.querySelectorAll('.section-view').forEach(el => el.classList.remove('active'));
+        document.getElementById('view-' + viewId).classList.add('active');
+        document.querySelectorAll('.mobile-btn, .side-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll(`[onclick="navTo('${viewId}')"]`).forEach(btn => btn.classList.add('active'));
+    }
+
+    function changeDay(delta) {
+        currentDay += delta;
+        if(currentDay < 1) currentDay = 1;
+        if(currentDay > 90) currentDay = 90;
+        localStorage.setItem('dk_day', currentDay);
+        loadDayUI(currentDay);
+    }
+
+    function loadDayUI(day) {
+        document.getElementById('day-display').innerText = day < 10 ? 'DAY 0' + day : 'DAY ' + day;
+        
+        // Date Logic
+        const dispDate = new Date(startDate);
+        dispDate.setDate(startDate.getDate() + (day - 1));
+        document.getElementById('date-display').innerText = dispDate.toLocaleDateString('en-US', {weekday:'long', month:'short', day:'numeric'}).toUpperCase();
+
+        // Phase Logic
+        let phase = 'phase1'; let pName = "SHADOW WARRIOR";
+        if(day > 30) { phase = 'phase2'; pName = "DARK GUARDIAN"; }
+        if(day > 60) { phase = 'phase3'; pName = "GOTHAM'S LEGEND"; }
+        document.getElementById('phase-badge').innerText = pName;
+
+        // Workout Logic
+        const isTraining = (day % 2 !== 0);
+        const container = document.getElementById('workout-container');
+        if(isTraining) {
+            let html = `<table class="workout-table">`;
+            workouts[phase].forEach((ex, i) => {
+                html += `<tr><td><div style="color:#fff; font-weight:bold">${ex.name}</div><div style="color:#666; font-size:0.7rem">${ex.target}</div></td>
+                    <td><input id="set_${i}_1" class="set-input" placeholder="-" onchange="save()"></td>
+                    <td><input id="set_${i}_2" class="set-input" placeholder="-" onchange="save()"></td>
+                    <td><input id="set_${i}_3" class="set-input" placeholder="-" onchange="save()"></td></tr>`;
+            });
+            container.innerHTML = html + `</table>`;
+        } else {
+            container.innerHTML = `<div style="padding:20px; text-align:center; color:#555">ACTIVE RECOVERY / STRETCHING PROTOCOL</div>`;
+        }
+
+        loadData();
+    }
+
+    // --- HYDRATION ---
+    function updateWater(amount) {
+        if(amount < 0) currentWater = 0; // Reset
+        else currentWater += amount;
+        if(currentWater > 3500) currentWater = 3500;
+        
+        const pct = (currentWater / 3500) * 100;
+        document.getElementById('hydro-bar').style.width = pct + "%";
+        document.getElementById('hydro-text').innerText = currentWater + " / 3500 ML";
+        save();
+    }
+
+    // --- STREAK COUNTER (Strict Logic) ---
+    function updateStreak() {
+        let streak = 0;
+        // Check if Today is done
+        const rawToday = localStorage.getItem(`dk_data_${currentDay}`);
+        const todayDone = rawToday && JSON.parse(rawToday).mission_complete;
+        
+        // Start checking backwards from today (if done) or yesterday (if today not done)
+        let startCheck = todayDone ? currentDay : currentDay - 1;
+        
+        for(let i = startCheck; i >= 1; i--) {
+            const raw = localStorage.getItem(`dk_data_${i}`);
+            if(raw && JSON.parse(raw).mission_complete) {
+                streak++;
+            } else {
+                break; // Streak broken
+            }
+        }
+        document.getElementById('streak-count').innerText = streak;
+    }
+
+    // --- MISSION COMPLETE TOGGLE ---
+    function toggleComplete() {
+        isMissionComplete = !isMissionComplete;
+        updateCompleteBtn();
+        save(); // Save status
+        updateStreak(); // Recalculate streak immediately
+    }
+
+    function updateCompleteBtn() {
+        const btn = document.getElementById('btn-complete');
+        if(isMissionComplete) {
+            btn.innerHTML = "★ MISSION COMPLETE";
+            btn.classList.add('done');
+        } else {
+            btn.innerHTML = "☐ MARK MISSION COMPLETE";
+            btn.classList.remove('done');
+        }
+    }
+
+    function renderChecklists() {
+        const createRow = (item) => `<div class="task-row"><div class="chk-group"><input type="checkbox" id="${item.id}" onchange="save()"><span class="task-text">${item.text}</span></div><span class="task-meta">${item.meta}</span></div>`;
+        ['body','mind','heart','wealth','purpose'].forEach(sec => {
+            document.getElementById(`${sec}-checklist`).innerHTML = checklists[sec].map(createRow).join('');
+        });
+    }
+
+    // --- TIMER ---
+    function updateCustomTime() { if(!isRunning) { totalSeconds = (parseInt(document.getElementById('custom-min').value)||25)*60; updateTimerDisplay(); }}
+    function toggleTimer() {
+        const btn = document.getElementById('btn-toggle');
+        if(isRunning) { clearInterval(timerInterval); isRunning = false; btn.innerText = "INITIATE"; btn.classList.remove('stop'); }
+        else { timerInterval = setInterval(() => { if(totalSeconds>0){totalSeconds--; updateTimerDisplay();} else {clearInterval(timerInterval); alert("DONE"); resetTimer();} }, 1000); isRunning = true; btn.innerText = "ABORT"; btn.classList.add('stop'); }
+    }
+    function resetTimer() { clearInterval(timerInterval); isRunning = false; document.getElementById('btn-toggle').innerText="INITIATE"; document.getElementById('btn-toggle').classList.remove('stop'); updateCustomTime(); }
+    function updateTimerDisplay() { const m=Math.floor(totalSeconds/60), s=totalSeconds%60; document.getElementById('timer-text').innerText=`${m<10?'0'+m:m}:${s<10?'0'+s:s}`; }
+
+    // --- SAVE/LOAD ---
+    function save() {
+        const data = { checks: {}, sets: {}, scores: {}, inputs: {}, water: currentWater, mission_complete: isMissionComplete };
+        document.querySelectorAll('input[type="checkbox"]').forEach(c => data.checks[c.id] = c.checked);
+        document.querySelectorAll('.set-input').forEach(i => data.sets[i.id] = i.value);
+        ['body','mind','heart','wealth','purp'].forEach(k => { data.scores[k] = parseInt(document.getElementById('score-'+k).value)||0; });
+        data.inputs.fam = document.getElementById('in-fam').value;
+        data.inputs.frnd = document.getElementById('in-frnd').value;
+        data.inputs.journal = document.getElementById('journal').value;
+
+        localStorage.setItem(`dk_data_${currentDay}`, JSON.stringify(data));
+        calcTotalScore();
+        
+        // Show indicator
+        const ind = document.getElementById('save-indicator');
+        ind.classList.add('show');
+        setTimeout(() => ind.classList.remove('show'), 1000);
+    }
+
+    function loadData() {
+        // Reset Inputs
+        document.querySelectorAll('input').forEach(i => { if(i.type==='checkbox')i.checked=false; else if(i.classList.contains('set-input')||i.type==='number'||i.id.includes('in-'))i.value=''; });
+        document.getElementById('journal').value = '';
+        currentWater = 0; updateWater(0);
+        isMissionComplete = false; updateCompleteBtn();
+
+        const raw = localStorage.getItem(`dk_data_${currentDay}`);
+        if(raw) {
+            const data = JSON.parse(raw);
+            if(data.checks) for(let k in data.checks) if(document.getElementById(k)) document.getElementById(k).checked = data.checks[k];
+            if(data.sets) for(let k in data.sets) if(document.getElementById(k)) document.getElementById(k).value = data.sets[k];
+            if(data.scores) for(let k in data.scores) if(document.getElementById('score-'+k)) document.getElementById('score-'+k).value = data.scores[k];
+            if(data.inputs) { document.getElementById('in-fam').value=data.inputs.fam||''; document.getElementById('in-frnd').value=data.inputs.frnd||''; document.getElementById('journal').value=data.inputs.journal||''; }
+            if(data.water) { currentWater = data.water; updateWater(0); }
+            if(data.mission_complete) { isMissionComplete = true; updateCompleteBtn(); }
+        }
+        calcTotalScore();
+        updateStreak(); // Check streak on load
+    }
+    
+    function calcTotalScore() {
+        let sum = 0;
+        ['body','mind','heart','wealth','purp'].forEach(k => sum += parseInt(document.getElementById('score-'+k).value)||0);
+        document.getElementById('score-total').value = sum;
+    }
+
+    // --- BACKUP SYSTEM ---
+    function exportData() {
+        const allData = {};
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key.startsWith('dk_')) allData[key] = localStorage.getItem(key);
+        }
+        const blob = new Blob([JSON.stringify(allData)], {type: 'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'wayne_terminal_backup.json'; a.click();
+    }
+
+    function importData(input) {
+        const file = input.files[0];
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const data = JSON.parse(e.target.result);
+            for (const key in data) localStorage.setItem(key, data[key]);
+            alert("DATABASE RESTORED SUCCESSFULLY");
+            location.reload();
+        };
+        reader.readAsText(file);
+    }
+</script>
+</body>
+</html>
